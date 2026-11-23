@@ -1,14 +1,13 @@
 import json
 import os
-import re
 import unicodedata
 from datetime import datetime
-from urllib.parse import quote, unquote
-import httpx
-from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException, Query, Response
+from pathlib import Path
+import requests
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -20,41 +19,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ORDERS_FILE = "orders.json"
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+KITS_DIR = STATIC_DIR / "kits"
+KITS_DIR.mkdir(parents=True, exist_ok=True)
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
-    "Cache-Control": "no-cache",
-}
+CAMISETAS_JSON = BASE_DIR / "camisetas.json"
+ORDERS_FILE = BASE_DIR / "orders.json"
 
-TEAM_SLUGS = {
-    "real madrid": "real-madrid",
-    "fc barcelona": "fc-barcelona",
-    "barcelona": "fc-barcelona",
-    "atletico": "atletico-madrid",
-    "atletico de madrid": "atletico-madrid",
-    "celta": "celta-vigo",
-    "celta de vigo": "celta-vigo",
-    "rc celta": "celta-vigo",
-    "rc celta de vigo": "celta-vigo",
-    "benfica": "sl-benfica",
-    "sl benfica": "sl-benfica",
-    "sport lisboa e benfica": "sl-benfica",
-    "espana": "spain",
-    "spain": "spain",
-    "argentina": "argentina",
-    "portugal": "portugal",
-    "man city": "manchester-city",
-    "manchester city": "manchester-city",
-    "psg": "paris-saint-germain",
-    "paris saint germain": "paris-saint-germain",
-}
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+CACHE: dict[str, dict] = {}
 
 
 class OrderItem(BaseModel):
@@ -79,143 +55,266 @@ class StatusUpdate(BaseModel):
     status: str
 
 
-def load_orders() -> list[dict]:
-    if not os.path.exists(ORDERS_FILE):
+def normalizar(texto: str) -> str:
+    clean = unicodedata.normalize("NFD", (texto or "").strip().lower())
+    return "".join(c for c in clean if unicodedata.category(c) != "Mn")
+
+
+def mapear_tipo(kit_type: str) -> str:
+    t = normalizar(kit_type)
+    if any(k in t for k in ("2", "away", "visitante", "segunda", "fuera")):
+        return "away"
+    if any(k in t for k in ("3", "third", "tercera", "alternativa")):
+        return "third"
+    if any(k in t for k in ("gk", "portero", "arquero", "goalkeeper")):
+        return "gk"
+    return "home"
+
+
+def temporadas_para_anio(anio: str) -> list[str]:
+    anio = (anio or "").strip()
+    if len(anio) == 4 and anio.isdigit():
+        y = int(anio)
+        y1 = str(y + 1)[-2:]
+        y0 = str(y - 1)[-2:]
+        return [
+            f"{y}-{y1}",
+            f"{y}/{y1}",
+            f"{y}-{y + 1}",
+            f"{y}/{y + 1}",
+            f"{y - 1}-{str(y)[-2:]}",
+            f"{y - 1}/{str(y)[-2:]}",
+            f"{str(y)[-2:]}/{y1}",
+            f"{str(y)[-2:]}-{y1}",
+            f"{y0}/{str(y)[-2:]}",
+            str(y),
+        ]
+    return [anio] if anio else []
+
+
+def cargar_catalogo_local() -> list[dict]:
+    if not CAMISETAS_JSON.exists():
         return []
-    with open(ORDERS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        data = json.loads(CAMISETAS_JSON.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
 
 
-def save_orders(orders: list[dict]) -> None:
-    with open(ORDERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(orders, f, ensure_ascii=False, indent=2)
+def buscar_en_catalogo_local(equipo: str, anio: str, tipo_code: str) -> list[dict]:
+    eq_norm = normalizar(equipo)
+    anio_norm = normalizar(anio)
+    temps = [normalizar(t) for t in temporadas_para_anio(anio)]
+    coincidencias = []
+
+    for item in cargar_catalogo_local():
+        nombres = [normalizar(item.get("equipo", ""))] + [
+            normalizar(a) for a in (item.get("alias") or [])
+        ]
+        if not any(eq_norm in n or n in eq_norm for n in nombres if n):
+            continue
+
+        item_tipo = normalizar(item.get("tipo", "home"))
+        item_anio = normalizar(str(item.get("anio", "")))
+        item_titulo = normalizar(item.get("titulo", ""))
+
+        score = 0
+        if item_tipo == tipo_code:
+            score += 10
+        if anio_norm and (item_anio == anio_norm or any(t in item_titulo for t in temps)):
+            score += 10
+
+        coincidencias.append((score, {
+            "url": item.get("imagen", ""),
+            "label": item.get("titulo") or f"{item.get('equipo')} ({item.get('anio')})",
+        }))
+
+    coincidencias.sort(key=lambda x: x[0], reverse=True)
+    return [c[1] for c in coincidencias if c[1]["url"]]
 
 
-def slugify(text: str) -> str:
-    clean = unicodedata.normalize("NFD", text.strip().lower())
-    clean = "".join(c for c in clean if unicodedata.category(c) != "Mn")
-    if clean in TEAM_SLUGS:
-        return TEAM_SLUGS[clean]
-    return re.sub(r"[^a-z0-9]+", "-", clean).strip("-")
+def buscar_en_google_imagenes(consulta: str) -> list[dict]:
+    if not SERPER_API_KEY:
+        return []
+    try:
+        r = requests.post(
+            "https://google.serper.dev/images",
+            headers={
+                "X-API-KEY": SERPER_API_KEY,
+                "Content-Type": "application/json",
+            },
+            json={"q": consulta, "num": 10},
+            timeout=12,
+        )
+        r.raise_for_status()
+        raw = r.json().get("images") or []
+        limpios = []
+        for idx, item in enumerate(raw):
+            url = item.get("imageUrl") or ""
+            if url.startswith("https://"):
+                limpios.append({
+                    "id": idx,
+                    "title": item.get("title") or "",
+                    "imageUrl": url,
+                    "link": item.get("link") or "",
+                })
+        return limpios
+    except requests.RequestException:
+        return []
 
 
-def format_season(season: str) -> str:
-    s = season.strip().replace("/", "-")
-    m = re.match(r"^(\d{4})-20(\d{2})$", s)
-    if m:
-        return f"{m.group(1)}-{m.group(2)}"
-    return s
+def elegir_con_ia(equipo: str, anio: str, tipo: str, candidatos: list[dict]) -> dict | None:
+    if not candidatos:
+        return None
+
+    temporadas = temporadas_para_anio(anio)
+
+    if not GEMINI_API_KEY:
+        if temporadas:
+            for c in candidatos:
+                t = (c.get("title") or "").lower()
+                if any(temp.lower() in t for temp in temporadas):
+                    return c
+        return candidatos[0]
+
+    prompt = (
+        f"Busco la camiseta de fútbol: equipo='{equipo}', año/temporada buscada='{anio}', "
+        f"formatos de temporada relacionados={temporadas}, equipación='{tipo}'.\n"
+        f"Elige el 'id' del candidato que mejor muestre la camiseta del equipo y tipo pedido.\n"
+        f"Prioridad:\n"
+        f"1. Que coincida con el año o temporada solicitada ({temporadas}).\n"
+        f"2. Que sea una foto/render de la camiseta (no un escudo, ni un balón, ni un jugador celebrando).\n"
+        f"3. Si ningún candidato muestra explícitamente ese año en el título, elige igualmente la mejor "
+        f"camiseta del equipo y tipo solicitado en vez de devolver null.\n\n"
+        f"Candidatos JSON:\n{json.dumps(candidatos, ensure_ascii=False)}\n\n"
+        f"Responde SOLO con JSON válido: {{\"id\": 0}}"
+    )
+
+    try:
+        r = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}",
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"responseMimeType": "application/json"},
+            },
+            timeout=12,
+        )
+        r.raise_for_status()
+        texto = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        elegido_id = json.loads(texto).get("id")
+        if elegido_id is not None:
+            for c in candidatos:
+                if c["id"] == elegido_id:
+                    return c
+    except Exception:
+        pass
+
+    return candidatos[0]
+
+
+def resolver_camisetas(equipo: str, anio: str, kit_type: str) -> list[dict]:
+    tipo_code = mapear_tipo(kit_type)
+    clave = f"{normalizar(equipo)}_{normalizar(anio)}_{tipo_code}"
+    if clave in CACHE:
+        return CACHE[clave]
+
+    resultados: list[dict] = []
+
+    # 1. Catálogo local (camisetas.json + /static/kits)
+    resultados.extend(buscar_en_catalogo_local(equipo, anio, tipo_code))
+
+    # 2. Serper Google Images + Gemini
+    if SERPER_API_KEY:
+        tipo_en = {
+            "home": "home kit",
+            "away": "away kit",
+            "third": "third kit",
+            "gk": "goalkeeper kit",
+        }.get(tipo_code, "home kit")
+
+        temps = temporadas_para_anio(anio)
+        consultas = []
+        if temps:
+            consultas.append(f"{equipo} {temps[0]} {tipo_en} jersey")
+            if len(temps) > 2:
+                consultas.append(f"{equipo} {temps[2]} {tipo_en} jersey")
+        consultas.append(f"{equipo} {anio} {tipo_en} football shirt".strip())
+
+        for q in consultas:
+            candidatos = buscar_en_google_imagenes(q)
+            if candidatos:
+                elegido = elegir_con_ia(equipo, anio, tipo_code, candidatos)
+                if elegido:
+                    resultados.append({
+                        "url": elegido["imageUrl"],
+                        "label": elegido["title"] or f"{equipo.title()} {anio} ({tipo_code.upper()})".strip(),
+                    })
+                for c in candidatos[:4]:
+                    if c["imageUrl"] and not any(x["url"] == c["imageUrl"] for x in resultados):
+                        resultados.append({
+                            "url": c["imageUrl"],
+                            "label": c["title"] or f"{equipo.title()} ({tipo_code.upper()})",
+                        })
+                break
+
+    CACHE[clave] = resultados
+    return resultados
+
+
+@app.get("/api/buscar")
+def buscar_camiseta(
+    equipo: str = Query(..., min_length=1),
+    anio: str = Query(""),
+    tipo: str = Query("home"),
+):
+    lista = resolver_camisetas(equipo, anio, tipo)
+    if not lista:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No se encontraron resultados para '{equipo}' ({anio or 'cualquier año'}, {tipo}).",
+        )
+    primero = lista[0]
+    return {
+        "equipo": equipo.title(),
+        "anio": anio or "Temporada",
+        "tipo": mapear_tipo(tipo).upper(),
+        "titulo": primero["label"],
+        "imagen": primero["url"],
+        "kits": lista,
+    }
 
 
 @app.get("/api/kit")
-async def search_kits(
-    team: str = Query(...),
+def buscar_kit_editor(
+    team: str = Query(..., min_length=1),
     season: str = Query("2026/27"),
     kit_type: str = Query("1ª Equipación"),
 ):
-    team_slug = slugify(team)
-    season_slug = format_season(season)
-    kits = []
-
-    async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=12.0) as client:
-        # 1. Intentar Football Kit Archive buscando cualquier imagen de equipación en el HTML
-        fka_urls = [
-            f"https://www.footballkitarchive.com/{team_slug}-{season_slug}-kits/",
-            f"https://www.footballkitarchive.com/{team_slug}-2025-26-kits/",
-            f"https://www.footballkitarchive.com/{team_slug}-2024-25-kits/",
-        ]
-        for url in fka_urls:
-            try:
-                r = await client.get(url)
-                if r.status_code == 200:
-                    soup = BeautifulSoup(r.text, "html.parser")
-                    for img in soup.find_all("img"):
-                        src = img.get("data-src") or img.get("src") or ""
-                        if "footballkitarchive" not in src.lower():
-                            continue
-                        if any(bad in src.lower() for bad in ("logo", "avatar", "flag", "icon", "badge")):
-                            continue
-                        if src.startswith("//"):
-                            src = "https:" + src
-                        label = (img.get("alt") or f"{team} ({season})").strip()
-                        proxied = f"/api/img?url={quote(src, safe='')}"
-                        if not any(k["raw"] == src for k in kits):
-                            kits.append({"url": proxied, "raw": src, "label": label})
-                    if kits:
-                        break
-            except Exception:
-                pass
-
-        # 2. TheSportsDB: traer todas las equipaciones oficiales disponibles del equipo
-        queries = [team_slug.replace("-", " "), team]
-        seen_teams = set()
-        for q in queries:
-            try:
-                rt = await client.get(
-                    f"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t={quote(q)}"
-                )
-                if rt.status_code == 200:
-                    for t in (rt.json().get("teams") or [])[:2]:
-                        tid = t.get("idTeam")
-                        if not tid or tid in seen_teams:
-                            continue
-                        seen_teams.add(tid)
-                        re_q = await client.get(
-                            f"https://www.thesportsdb.com/api/v1/json/3/lookupequipment.php?id={tid}"
-                        )
-                        if re_q.status_code == 200:
-                            for eq in re_q.json().get("equipment") or []:
-                                eq_url = eq.get("strEquipment")
-                                if eq_url:
-                                    eq_season = eq.get("strSeason") or "Oficial"
-                                    kits.append({
-                                        "url": f"/api/img?url={quote(eq_url, safe='')}",
-                                        "raw": eq_url,
-                                        "label": f"{t.get('strTeam', team)} · {eq_season}",
-                                    })
-            except Exception:
-                pass
-
-    priority_keywords = {
-        "1": ["home", "1st", "local"],
-        "2": ["away", "2nd", "visitante"],
-        "3": ["third", "3rd", "tercera"],
-        "4": ["fourth", "4th"],
-        "p": ["gk", "goalkeeper", "portero"],
-    }
-    keys = priority_keywords.get(kit_type.strip().lower()[:1], ["home"])
-
-    def sort_key(item):
-        lbl = item["label"].lower()
-        is_kit_type = 0 if any(k in lbl for k in keys) else 1
-        is_season = 0 if season.replace("/", "-") in lbl.replace("/", "-") else 1
-        return (is_kit_type, is_season)
-
-    kits.sort(key=sort_key)
-    return {"kits": [{"url": k["url"], "label": k["label"]} for k in kits]}
+    return {"kits": resolver_camisetas(team, season, kit_type)}
 
 
-@app.get("/api/img")
-async def proxy_image(url: str = Query(...)):
-    decoded_url = unquote(url)
-    async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=12.0) as client:
-        r = await client.get(decoded_url)
-        if r.status_code == 200:
-            return Response(
-                content=r.content,
-                media_type=r.headers.get("content-type", "image/png"),
-                headers={"Cache-Control": "public, max-age=86400"},
-            )
-    return Response(status_code=404)
+def load_orders() -> list[dict]:
+    if not ORDERS_FILE.exists():
+        return []
+    try:
+        return json.loads(ORDERS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_orders(orders: list[dict]) -> None:
+    ORDERS_FILE.write_text(json.dumps(orders, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @app.get("/api/orders")
-async def get_orders():
+def get_orders():
     return {"orders": load_orders()}
 
 
 @app.post("/api/orders")
-async def create_order(order: OrderCreate):
+def create_order(order: OrderCreate):
     orders = load_orders()
     new_order = {
         "id": f"PED-{100 + len(orders) + 1}",
@@ -232,7 +331,7 @@ async def create_order(order: OrderCreate):
 
 
 @app.patch("/api/orders/{order_id}")
-async def patch_order(order_id: str, payload: StatusUpdate):
+def patch_order(order_id: str, payload: StatusUpdate):
     if payload.status not in ("En espera", "Vendida"):
         raise HTTPException(status_code=400, detail="Estado no válido")
     orders = load_orders()
@@ -244,6 +343,9 @@ async def patch_order(order_id: str, payload: StatusUpdate):
     raise HTTPException(status_code=404, detail="Pedido no encontrado")
 
 
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
 @app.get("/")
-async def serve_frontend():
-    return FileResponse("index.html")
+def servir_inicio():
+    return FileResponse(str(BASE_DIR / "index.html"))
