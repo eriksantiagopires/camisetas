@@ -21,16 +21,16 @@ app.add_middleware(
 )
 
 ORDERS_FILE = "orders.json"
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/130.0.0.0 Safari/537.36"
+        "Chrome/131.0.0.0 Safari/537.36"
     ),
-    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-    "Referer": "https://www.footballkitarchive.com/",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+    "Cache-Control": "no-cache",
 }
 
 TEAM_SLUGS = {
@@ -43,40 +43,17 @@ TEAM_SLUGS = {
     "celta de vigo": "celta-vigo",
     "rc celta": "celta-vigo",
     "rc celta de vigo": "celta-vigo",
-    "deportivo": "deportivo-la-coruna",
-    "deportivo de la coruna": "deportivo-la-coruna",
     "benfica": "sl-benfica",
     "sl benfica": "sl-benfica",
     "sport lisboa e benfica": "sl-benfica",
-    "porto": "fc-porto",
-    "fc porto": "fc-porto",
-    "sporting": "sporting-cp",
-    "sporting cp": "sporting-cp",
     "espana": "spain",
     "spain": "spain",
     "argentina": "argentina",
     "portugal": "portugal",
-    "francia": "france",
-    "france": "france",
-    "brasil": "brazil",
-    "brazil": "brazil",
-    "alemania": "germany",
-    "italia": "italy",
-    "inglaterra": "england",
     "man city": "manchester-city",
     "manchester city": "manchester-city",
-    "man united": "manchester-united",
-    "manchester united": "manchester-united",
-    "arsenal": "arsenal-fc",
-    "liverpool": "liverpool-fc",
-    "chelsea": "chelsea-fc",
     "psg": "paris-saint-germain",
     "paris saint germain": "paris-saint-germain",
-    "bayern": "fc-bayern-munchen",
-    "bayern munich": "fc-bayern-munchen",
-    "inter": "inter-milan",
-    "milan": "ac-milan",
-    "juventus": "juventus-fc",
 }
 
 
@@ -138,71 +115,66 @@ async def search_kits(
 ):
     team_slug = slugify(team)
     season_slug = format_season(season)
-    target_url = f"https://www.footballkitarchive.com/{team_slug}-{season_slug}-kits/"
-
     kits = []
+
     async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True, timeout=12.0) as client:
-        resp = await client.get(target_url)
+        # 1. Intentar Football Kit Archive buscando cualquier imagen de equipación en el HTML
+        fka_urls = [
+            f"https://www.footballkitarchive.com/{team_slug}-{season_slug}-kits/",
+            f"https://www.footballkitarchive.com/{team_slug}-2025-26-kits/",
+            f"https://www.footballkitarchive.com/{team_slug}-2024-25-kits/",
+        ]
+        for url in fka_urls:
+            try:
+                r = await client.get(url)
+                if r.status_code == 200:
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    for img in soup.find_all("img"):
+                        src = img.get("data-src") or img.get("src") or ""
+                        if "footballkitarchive" not in src.lower():
+                            continue
+                        if any(bad in src.lower() for bad in ("logo", "avatar", "flag", "icon", "badge")):
+                            continue
+                        if src.startswith("//"):
+                            src = "https:" + src
+                        label = (img.get("alt") or f"{team} ({season})").strip()
+                        proxied = f"/api/img?url={quote(src, safe='')}"
+                        if not any(k["raw"] == src for k in kits):
+                            kits.append({"url": proxied, "raw": src, "label": label})
+                    if kits:
+                        break
+            except Exception:
+                pass
 
-        if resp.status_code != 200:
-            search_resp = await client.get(
-                f"https://www.footballkitarchive.com/search/?q={quote(team)}"
-            )
-            if search_resp.status_code == 200:
-                soup_s = BeautifulSoup(search_resp.text, "html.parser")
-                for a in soup_s.select("a[href*='-kits/']"):
-                    href = a.get("href", "")
-                    if season_slug in href or team_slug.split("-")[0] in href:
-                        full_url = (
-                            href
-                            if href.startswith("http")
-                            else f"https://www.footballkitarchive.com{href}"
+        # 2. TheSportsDB: traer todas las equipaciones oficiales disponibles del equipo
+        queries = [team_slug.replace("-", " "), team]
+        seen_teams = set()
+        for q in queries:
+            try:
+                rt = await client.get(
+                    f"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t={quote(q)}"
+                )
+                if rt.status_code == 200:
+                    for t in (rt.json().get("teams") or [])[:2]:
+                        tid = t.get("idTeam")
+                        if not tid or tid in seen_teams:
+                            continue
+                        seen_teams.add(tid)
+                        re_q = await client.get(
+                            f"https://www.thesportsdb.com/api/v1/json/3/lookupequipment.php?id={tid}"
                         )
-                        resp = await client.get(full_url)
-                        if resp.status_code == 200:
-                            break
-
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            for card in soup.select(".kit-container, .collection-item, a[href*='-kit/']"):
-                img = card.find("img")
-                if not img:
-                    continue
-                src = img.get("data-src") or img.get("src") or ""
-                if not src or "logo" in src.lower() or "placeholder" in src.lower():
-                    continue
-                if src.startswith("//"):
-                    src = "https:" + src
-                elif src.startswith("/"):
-                    src = "https://www.footballkitarchive.com" + src
-
-                label = (img.get("alt") or card.get_text(" ", strip=True) or "Football Kit Archive").strip()
-                proxied = f"/api/img?url={quote(src, safe='')}"
-                if not any(k["raw"] == src for k in kits):
-                    kits.append({"url": proxied, "raw": src, "label": label})
-
-        # Respaldo automático con TheSportsDB si FKA aún no indexó esa temporada
-        if not kits:
-            tsdb_query = team_slug.replace("-", " ")
-            r_team = await client.get(
-                f"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t={quote(tsdb_query)}"
-            )
-            if r_team.status_code == 200:
-                teams_data = r_team.json().get("teams") or []
-                if teams_data:
-                    team_id = teams_data[0]["idTeam"]
-                    r_eq = await client.get(
-                        f"https://www.thesportsdb.com/api/v1/json/3/lookupequipment.php?id={team_id}"
-                    )
-                    if r_eq.status_code == 200:
-                        for eq in r_eq.json().get("equipment") or []:
-                            eq_url = eq.get("strEquipment")
-                            if eq_url:
-                                kits.append({
-                                    "url": f"/api/img?url={quote(eq_url, safe='')}",
-                                    "raw": eq_url,
-                                    "label": f"{teams_data[0]['strTeam']} ({eq.get('strSeason', 'Oficial')})",
-                                })
+                        if re_q.status_code == 200:
+                            for eq in re_q.json().get("equipment") or []:
+                                eq_url = eq.get("strEquipment")
+                                if eq_url:
+                                    eq_season = eq.get("strSeason") or "Oficial"
+                                    kits.append({
+                                        "url": f"/api/img?url={quote(eq_url, safe='')}",
+                                        "raw": eq_url,
+                                        "label": f"{t.get('strTeam', team)} · {eq_season}",
+                                    })
+            except Exception:
+                pass
 
     priority_keywords = {
         "1": ["home", "1st", "local"],
@@ -211,15 +183,15 @@ async def search_kits(
         "4": ["fourth", "4th"],
         "p": ["gk", "goalkeeper", "portero"],
     }
-    first_char = kit_type.strip().lower()[:1]
-    keys = priority_keywords.get(first_char, ["home"])
+    keys = priority_keywords.get(kit_type.strip().lower()[:1], ["home"])
 
-    kits.sort(
-        key=lambda item: 0
-        if any(k in item["label"].lower() for k in keys)
-        else 1
-    )
+    def sort_key(item):
+        lbl = item["label"].lower()
+        is_kit_type = 0 if any(k in lbl for k in keys) else 1
+        is_season = 0 if season.replace("/", "-") in lbl.replace("/", "-") else 1
+        return (is_kit_type, is_season)
 
+    kits.sort(key=sort_key)
     return {"kits": [{"url": k["url"], "label": k["label"]} for k in kits]}
 
 
@@ -231,7 +203,7 @@ async def proxy_image(url: str = Query(...)):
         if r.status_code == 200:
             return Response(
                 content=r.content,
-                media_type=r.headers.get("content-type", "image/webp"),
+                media_type=r.headers.get("content-type", "image/png"),
                 headers={"Cache-Control": "public, max-age=86400"},
             )
     return Response(status_code=404)
