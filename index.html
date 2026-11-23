@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Vestuario FC — Pedidos de Camisetas</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #059669;
+      --accent-dark: #047857;
+      --soft: #f3f6fa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--ink); line-height: 1.5; }
+    header {
+      background: #fff; border-bottom: 1px solid var(--line);
+      padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { font-weight: 800; font-size: 1.1rem; letter-spacing: .02em; }
+    .brand span { display: block; font-size: .7rem; color: var(--accent); letter-spacing: .12em; }
+    .container { max-width: 1120px; margin: 28px auto; padding: 0 18px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 18px; padding: 24px; box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    }
+    .hero { text-align: center; padding: 52px 20px; }
+    .hero h1 { font-size: 2.2rem; margin-bottom: 10px; }
+    .hero p { color: var(--muted); max-width: 520px; margin: 0 auto 24px; }
+    .grid-2 { display: grid; grid-template-columns: 1.15fr .85fr; gap: 24px; align-items: start; }
+    @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+    label { display: block; font-weight: 600; font-size: .9rem; margin: 14px 0 6px; }
+    input, select {
+      width: 100%; padding: 11px 13px; border: 1px solid #cbd5e1;
+      border-radius: 10px; font-size: .95rem; background: #fff;
+    }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .toggle-box {
+      margin-top: 14px; padding: 14px; border: 1px solid var(--line);
+      border-radius: 12px; background: #f8fafc; display: flex;
+      justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .pill-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .chip {
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+      background: #fff; cursor: pointer; font-size: .82rem; font-weight: 600;
+    }
+    .chip.active, .size-btn.active, .seg-btn.active {
+      background: var(--ink); color: #fff; border-color: var(--ink);
+    }
+    .size-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 8px; }
+    .size-btn {
+      padding: 10px 0; border-radius: 10px; border: 1px solid #cbd5e1;
+      background: #fff; font-weight: 700; cursor: pointer;
+    }
+    .btn {
+      padding: 12px 18px; border-radius: 12px; border: 1px solid #cbd5e1;
+      background: #fff; font-weight: 700; cursor: pointer; font-size: .95rem;
+    }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .actions { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
+
+    /* Tarjeta VISTA PREVIA EN VIVO */
+    .preview-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+    }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: .78rem; font-weight: 800; letter-spacing: .06em; color: #334155;
+    }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
+    .size-tag {
+      background: var(--ink); color: #fff; padding: 4px 12px;
+      border-radius: 999px; font-size: .8rem; font-weight: 700;
+    }
+    .preview-box {
+      background: var(--soft); border-radius: 16px; padding: 24px 18px;
+      text-align: center;
+    }
+    .preview-box h2 { font-size: 1.35rem; color: var(--ink); }
+    .preview-box .sub { color: var(--muted); font-size: .9rem; margin-bottom: 16px; }
+    .stage {
+      position: relative; background: #fff; border-radius: 14px;
+      padding: 16px; max-width: 300px; margin: 0 auto;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
+    }
+    .stage img {
+      width: 100%; height: 250px; object-fit: contain; display: block; border-radius: 8px;
+    }
+    .nav-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line);
+      background: #fff; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .nav-arrow.prev { left: -14px; }
+    .nav-arrow.next { right: -14px; }
+    .meta-tags { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .meta-pill {
+      background: #fff; border: 1px solid var(--line); padding: 4px 10px;
+      border-radius: 8px; font-size: .78rem; font-weight: 600; color: #334155;
+    }
+    .price-row {
+      display: flex; justify-content: space-between; margin-top: 12px;
+      font-size: .92rem; color: #334155;
+    }
+    .price-total {
+      display: flex; justify-content: space-between; margin-top: 10px;
+      padding-top: 10px; border-top: 1px solid var(--line);
+      font-size: 1.15rem; font-weight: 800; color: var(--accent);
+    }
+    .cart-item {
+      display: flex; gap: 16px; align-items: center; padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .cart-item img {
+      width: 72px; height: 72px; object-fit: contain; background: var(--soft);
+      border-radius: 10px; padding: 6px;
+    }
+    .order-card {
+      border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+      margin-top: 14px; background: #fafbfd;
+    }
+    .status-pill {
+      padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700;
+    }
+    .status-wait { background: #fef3c7; color: #92400e; }
+    .status-sold { background: #d1fae5; color: #065f46; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">EL VESTUARIO FC <span>EQUIPACIONES DE FÚTBOL</span></div>
+    <div>
+      <button class="btn" onclick="go('screen-home')">Inicio</button>
+      <button class="btn" onclick="openAdmin()">Admin</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- 1. INICIO -->
+    <section id="screen-home" class="card hero">
+      <h1>Pide tu camiseta de fútbol personalizada</h1>
+      <p>Elige club o selección, temporada, equipación, dorsal opcional (+3€), parche y talla con previsualización oficial en vivo.</p>
+      <button class="btn btn-primary" onclick="go('screen-customer')">Comenzar pedido →</button>
+    </section>
+
+    <!-- 2. DATOS DEL CLIENTE -->
+    <section id="screen-customer" class="card hidden" style="max-width:520px;margin:0 auto;">
+      <h2>Tus datos de contacto</h2>
+      <p style="color:var(--muted);font-size:.9rem;margin-top:4px;">Nombre y teléfono son obligatorios para tramitar tu pedido.</p>
+      <label for="cust-name">Nombre completo *</label>
+      <input id="cust-name" type="text" placeholder="Ej. Javier Rodríguez" required />
+      <label for="cust-phone">Número de teléfono *</label>
+      <input id="cust-phone" type="tel" placeholder="Ej. +34 612 345 678" required />
+      <p id="cust-error" style="color:#dc2626;font-size:.85rem;margin-top:8px;" class="hidden">Completa tanto tu nombre como tu teléfono para continuar.</p>
+      <div class="actions">
+        <button class="btn" onclick="go('screen-home')">← Atrás</button>
+        <button class="btn btn-primary" onclick="submitCustomer()">Siguiente →</button>
+      </div>
+    </section>
+
+    <!-- 3. CONFIGURADOR -->
+    <section id="screen-builder" class="grid-2 hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2>Configura tu camiseta</h2>
+          <span id="customer-badge" class="chip"></span>
+        </div>
+
+        <label for="team-input">Equipo o Selección *</label>
+        <input id="team-input" type="text" value="Real Madrid" oninput="scheduleSearch()" />
+        <div class="pill-group">
+          <button class="chip active" onclick="quickTeam('Real Madrid', this)">Real Madrid</button>
+          <button class="chip" onclick="quickTeam('FC Barcelona', this)">FC Barcelona</button>
+          <button class="chip" onclick="quickTeam('Sport Lisboa e Benfica', this)">Benfica</button>
+          <button class="chip" onclick="quickTeam('RC Celta de Vigo', this)">Celta Vigo</button>
+          <button class="chip" onclick="quickTeam('España', this)">España</button>
+          <button class="chip" onclick="quickTeam('Argentina', this)">Argentina</button>
+        </div>
+
+        <div class="row-2">
+          <div>
+            <label for="season-input">Año / Temporada</label>
+            <input id="season-input" type="text" value="2026/27" oninput="scheduleSearch()" />
+          </div>
+          <div>
+            <label for="kit-select">Equipación</label>
+            <select id="kit-select" onchange="scheduleSearch()">
+              <option value="1ª Equipación">1ª Equipación</option>
+              <option value="2ª Equipación">2ª Equipación</option>
+              <option value="3ª Equipación">3ª Equipación</option>
+              <option value="Portero">Portero</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toggle-box">
+          <div>
+            <strong>Nombre y Número en la camiseta</strong>
+            <div style="font-size:.82rem;color:var(--muted);">Elige "No, por defecto" o añade dorsal por +3€</div>
+          </div>
+          <div class="pill-group" style="margin-top:0;">
+            <button id="btn-dorsal-no" class="chip seg-btn active" onclick="setDorsal(false)">No, por defecto</button>
+            <button id="btn-dorsal-yes" class="chip seg-btn" onclick="setDorsal(true)">Sí (+3€)</button>
+          </div>
+          <div id="dorsal-fields" class="row-2 hidden" style="width:100%;margin-top:6px;">
+            <input id="player-name" type="text" placeholder="Nombre (ej. MBAPPÉ)" oninput="updateSummary()" />
+            <input id="player-number" type="text" maxlength="2" placeholder="Número (ej. 9)" oninput="updateSummary()" />
+          </div>
+        </div>
+
+        <label for="patch-select">Parche</label>
+        <select id="patch-select" onchange="updateSummary()">
+          <option value="No, por defecto">No, por defecto</option>
+          <option value="Champions League">Champions League</option>
+          <option value="Liga / Competición">Liga / Competición</option>
+          <option value="Mundial / Selección">Mundial / Selección</option>
+        </select>
+
+        <label>Talla</label>
+        <div class="size-grid" id="size-grid">
+          <button class="size-btn" onclick="selectSize('XS', this)">XS</button>
+          <button class="size-btn" onclick="selectSize('S', this)">S</button>
+          <button class="size-btn active" onclick="selectSize('M', this)">M</button>
+          <button class="size-btn" onclick="selectSize('L', this)">L</button>
+          <button class="size-btn" onclick="selectSize('XL', this)">XL</button>
+          <button class="size-btn" onclick="selectSize('XXL', this)">XXL</button>
+        </div>
+
+        <div class="actions">
+          <button class="btn" onclick="addShirtToCart(true)">+ Añadir otra al pedido</button>
+          <button class="btn btn-primary" onclick="addShirtToCart(false)">Finalizar pedido →</button>
+        </div>
+      </div>
+
+      <!-- TARJETA VISTA PREVIA EN VIVO -->
+      <div class="card">
+        <div class="preview-header">
+          <span class="live-badge"><span class="live-dot"></span> VISTA PREVIA EN VIVO</span>
+          <span id="preview-size" class="size-tag">Talla M</span>
+        </div>
+
+        <div class="preview-box">
+          <h2 id="preview-team">Real Madrid</h2>
+          <div id="preview-sub" class="sub">1ª Equipación • 2026/27</div>
+          <div class="stage">
+            <button class="nav-arrow prev" onclick="cyclePhoto(-1)" aria-label="Foto anterior">‹</button>
+            <img id="preview-img" alt="Vista previa de camiseta" />
+            <button class="nav-arrow next" onclick="cyclePhoto(1)" aria-label="Siguiente foto">›</button>
+          </div>
+          <div class="meta-tags">
+            <span id="preview-dorsal" class="meta-pill">Dorsal: No, por defecto</span>
+            <span id="preview-patch" class="meta-pill">Parche: No, por defecto</span>
+          </div>
+          <div id="preview-source" style="font-size:.76rem;color:var(--muted);margin-top:10px;"></div>
+        </div>
+
+        <div class="price-row">
+          <span>Camiseta base</span>
+          <span>25,00 €</span>
+        </div>
+        <div class="price-row">
+          <span>Nombre y número</span>
+          <span id="preview-dorsal-price">0,00 €</span>
+        </div>
+        <div class="price-total">
+          <span>Total camiseta</span>
+          <span id="preview-total">25,00 €</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. CESTA DE COMPRA -->
+    <section id="screen-cart" class="card hidden" style="max-width:760px;margin:0 auto;">
+      <h2>Cesta de compra</h2>
+      <p id="cart-customer" style="color:var(--muted);font-size:.9rem;margin-top:4px;"></p>
+      <div id="cart-items" style="margin-top:14px;"></div>
+      <div class="price-total" style="margin-top:18px;">
+        <span>Total del pedido</span>
+        <span id="cart-total">0,00 €</span>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="go('screen-builder')">+ Añadir otra al pedido</button>
+        <button class="btn btn-primary" onclick="confirmOrder()">Finalizar pedido</button>
+      </div>
+    </section>
+
+    <!-- CONFIRMACIÓN -->
+    <section id="screen-done" class="card hero hidden">
+      <h1>¡Pedido registrado!</h1>
+      <p>Tu pedido ya está guardado en el panel de administración como <strong>En espera</strong>.</p>
+      <button class="btn btn-primary" onclick="resetFlow()">Hacer otro pedido</button>
+    </section>
+
+    <!-- 5. PANEL DE ADMINISTRACIÓN -->
+    <section id="screen-admin" class="card hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2>Panel de Administración — Pedidos</h2>
+          <p style="color:var(--muted);font-size:.9rem;">Gestiona cada pedido cambiando su estado entre <strong>En espera</strong> y <strong>Vendida</strong>.</p>
+        </div>
+        <button class="btn" onclick="loadAdminOrders()">Actualizar lista</button>
+      </div>
+      <div id="admin-orders"></div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      customer: { name: '', phone: '' },
+      dorsalEnabled: false,
+      size: 'M',
+      photos: [],
+      photoIdx: 0,
+      cart: [],
+      adminUnlocked: false
+    };
+
+    let searchTimer;
+
+    function go(id) {
+      document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      if (id === 'screen-cart') renderCart();
+      if (id === 'screen-admin') loadAdminOrders();
+      if (id === 'screen-builder') updateSummary();
+    }
+
+    function openAdmin() {
+      if (!state.adminUnlocked) {
+        const pass = prompt('Contraseña de administrador:');
+        if (pass !== 'admin123') {
+          alert('Contraseña incorrecta');
+          return;
+        }
+        state.adminUnlocked = true;
+      }
+      go('screen-admin');
+    }
+
+    function submitCustomer() {
+      const name = document.getElementById('cust-name').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      const err = document.getElementById('cust-error');
+      if (!name || !phone) {
+        err.classList.remove('hidden');
+        return;
+      }
+      err.classList.add('hidden');
+      state.customer = { name, phone };
+      document.getElementById('customer-badge').textContent = `${name} · ${phone}`;
+      go('screen-builder');
+      loadKitPhotos();
+    }
+
+    function quickTeam(team, btn) {
+      document.getElementById('team-input').value = team;
+      document.querySelectorAll('.pill-group .chip:not(.seg-btn)').forEach(c => c.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      scheduleSearch();
+    }
+
+    function setDorsal(enabled) {
+      state.dorsalEnabled = enabled;
+      document.getElementById('btn-dorsal-no').classList.toggle('active', !enabled);
+      document.getElementById('btn-dorsal-yes').classList.toggle('active', enabled);
+      document.getElementById('dorsal-fields').classList.toggle('hidden', !enabled);
+      updateSummary();
+    }
+
+    function selectSize(sz, btn) {
+      state.size = sz;
+      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateSummary();
+    }
+
+    function currentShirtPrice() {
+      return 25 + (state.dorsalEnabled ? 3 : 0);
+    }
+
+    function updateSummary() {
+      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const season = document.getElementById('season-input').value.trim() || '2026/27';
+      const kit = document.getElementById('kit-select').value;
+      const patch = document.getElementById('patch-select').value;
+      const pName = document.getElementById('player-name').value.trim();
+      const pNum = document.getElementById('player-number').value.trim();
+
+      const dorsalLabel = state.dorsalEnabled
+        ? `${pName || 'Sin nombre'} · ${pNum || '00'} (+3€)`
+        : 'No, por defecto';
+
+      document.getElementById('preview-team').textContent = team;
+      document.getElementById('preview-sub').textContent = `${kit} • ${season}`;
+      document.getElementById('preview-size').textContent = `Talla ${state.size}`;
+      document.getElementById('preview-dorsal').textContent = `Dorsal: ${dorsalLabel}`;
+      document.getElementById('preview-patch').textContent = `Parche: ${patch}`;
+      document.getElementById('preview-dorsal-price').textContent = state.dorsalEnabled ? '3,00 €' : '0,00 €';
+      document.getElementById('preview-total').textContent = `${currentShirtPrice().toFixed(2).replace('.', ',')} €`;
+    }
+
+    function scheduleSearch() {
+      updateSummary();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadKitPhotos, 350);
+    }
+
+    function fallbackSvgJersey(team, kit, season) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+        <rect width="320" height="320" rx="16" fill="#ffffff"/>
+        <path d="M95 55 L130 40 Q160 56 190 40 L225 55 L275 105 L242 142 L212 115 L212 275 L108 275 L108 115 L78 142 L45 105 Z" fill="#f8fafc" stroke="#0f172a" stroke-width="5"/>
+        <text x="160" y="165" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="700" fill="#0f172a">${team.slice(0, 18)}</text>
+        <text x="160" y="190" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#475569">${kit} · ${season}</text>
+      </svg>`;
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
+    async function loadKitPhotos() {
+      const team = document.getElementById('team-input').value.trim() || 'Real Madrid';
+      const season = document.getElementById('season-input').value.trim() || '2026/27';
+      const kit = document.getElementById('kit-select').value;
+      const sourceEl = document.getElementById('preview-source');
+      sourceEl.textContent = 'Buscando en Football Kit Archive...';
+
+      let found = [];
+      try {
+        const res = await fetch(`/api/kit?team=${encodeURIComponent(team)}&season=${encodeURIComponent(season)}&kit_type=${encodeURIComponent(kit)}`);
+        if (res.ok) {
+          const data = await res.json();
+          found = data.kits || [];
+        }
+      } catch (_) {}
+
+      if (!found.length) {
+        found = [{
+          url: fallbackSvgJersey(team, kit, season),
+          label: 'Sin foto oficial encontrada para esta temporada'
+        }];
+      }
+
+      state.photos = found;
+      state.photoIdx = 0;
+      renderPhoto();
+    }
+
+    function renderPhoto() {
+      const img = document.getElementById('preview-img');
+      const sourceEl = document.getElementById('preview-source');
+      const current = state.photos[state.photoIdx];
+      if (!current) return;
+      img.src = current.url;
+      sourceEl.textContent = `${current.label} (${state.photoIdx + 1}/${state.photos.length})`;
+    }
+
+    function cyclePhoto(delta) {
+      if (!state.photos.length) return;
+      state.photoIdx = (state.photoIdx + delta + state.photos.length) % state.photos.length;
+      renderPhoto();
+    }
+
+    function addShirtToCart(addAnother) {
+      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const season = document.getElementById('season-input').value.trim() || '2026/27';
+      const kit = document.getElementById('kit-select').value;
+      const patch = document.getElementById('patch-select').value;
+      const pName = document.getElementById('player-name').value.trim();
+      const pNum = document.getElementById('player-number').value.trim();
+
+      state.cart.push({
+        team,
+        season,
+        kit,
+        size: state.size,
+        patch,
+        dorsalText: state.dorsalEnabled ? `${pName || 'Sin nombre'} · ${pNum || '00'} (+3€)` : 'No, por defecto',
+        price: currentShirtPrice(),
+        img: document.getElementById('preview-img').src
+      });
+
+      if (addAnother) {
+        document.getElementById('player-name').value = '';
+        document.getElementById('player-number').value = '';
+        setDorsal(false);
+      } else {
+        go('screen-cart');
+      }
+    }
+
+    function renderCart() {
+      document.getElementById('cart-customer').textContent =
+        `Cliente: ${state.customer.name} · Teléfono: ${state.customer.phone}`;
+      const container = document.getElementById('cart-items');
+      if (!state.cart.length) {
+        container.innerHTML = '<p style="color:var(--muted);">No hay camisetas en la cesta todavía.</p>';
+        document.getElementById('cart-total').textContent = '0,00 €';
+        return;
+      }
+      container.innerHTML = state.cart.map((item, idx) => `
+        <div class="cart-item">
+          <img src="${item.img}" alt="${item.team}" />
+          <div style="flex:1;">
+            <strong>${item.team}</strong> (${item.kit} • ${item.season})
+            <div style="font-size:.85rem;color:var(--muted);">
+              Talla: <strong>${item.size}</strong> · Dorsal: ${item.dorsalText} · Parche: ${item.patch}
+            </div>
+          </div>
+          <div style="font-weight:800;">${item.price.toFixed(2).replace('.', ',')} €</div>
+          <button class="btn" onclick="removeCartItem(${idx})">Quitar</button>
+        </div>
+      `).join('');
+
+      const total = state.cart.reduce((acc, i) => acc + i.price, 0);
+      document.getElementById('cart-total').textContent = `${total.toFixed(2).replace('.', ',')} €`;
+    }
+
+    function removeCartItem(idx) {
+      state.cart.splice(idx, 1);
+      renderCart();
+    }
+
+    async function confirmOrder() {
+      if (!state.cart.length) return;
+      const total = state.cart.reduce((acc, i) => acc + i.price, 0);
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: state.customer.name,
+          phone: state.customer.phone,
+          total,
+          items: state.cart
+        })
+      });
+      if (res.ok) {
+        state.cart = [];
+        go('screen-done');
+      }
+    }
+
+    function resetFlow() {
+      state.cart = [];
+      document.getElementById('cust-name').value = '';
+      document.getElementById('cust-phone').value = '';
+      go('screen-home');
+    }
+
+    async function loadAdminOrders() {
+      const container = document.getElementById('admin-orders');
+      container.innerHTML = '<p style="margin-top:12px;color:var(--muted);">Cargando pedidos...</p>';
+      const res = await fetch('/api/orders');
+      const data = await res.json();
+      const orders = data.orders || [];
+
+      if (!orders.length) {
+        container.innerHTML = '<p style="margin-top:12px;color:var(--muted);">Todavía no hay pedidos registrados.</p>';
+        return;
+      }
+
+      container.innerHTML = orders.map(order => `
+        <div class="order-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <strong>${order.id}</strong> · <span style="color:var(--muted);font-size:.82rem;">${order.created_at || ''}</span>
+              <div><strong>${order.customer}</strong> — <a href="tel:${order.phone}">${order.phone}</a> · Total: <strong>${Number(order.total).toFixed(2).replace('.', ',')} €</strong></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="status-pill ${order.status === 'Vendida' ? 'status-sold' : 'status-wait'}">${order.status}</span>
+              <select onchange="updateOrderStatus('${order.id}', this.value)" style="width:auto;">
+                <option value="En espera" ${order.status === 'En espera' ? 'selected' : ''}>En espera</option>
+                <option value="Vendida" ${order.status === 'Vendida' ? 'selected' : ''}>Vendida</option>
+              </select>
+            </div>
+          </div>
+          <ul style="margin-top:10px;padding-left:18px;font-size:.9rem;">
+            ${order.items.map(i => `
+              <li>${i.team} (${i.kit} • ${i.season}) — Talla <strong>${i.size}</strong> — Dorsal: ${i.dorsalText} — Parche: ${i.patch} (${Number(i.price).toFixed(2).replace('.', ',')} €)</li>
+            `).join('')}
+          </ul>
+        </div>
+      `).join('');
+    }
+
+    async function updateOrderStatus(orderId, status) {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      loadAdminOrders();
+    }
+
+    updateSummary();
+  </script>
+</body>
+</html>
