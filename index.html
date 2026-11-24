@@ -755,11 +755,11 @@
         </div>
 
         <div class="preview-stage">
-          <button class="nav-arrow prev" onclick="cyclePhoto(-1)" aria-label="Anterior">‹</button>
+          <button id="btn-prev-photo" class="nav-arrow prev hidden" onclick="cyclePhoto(-1)" aria-label="Anterior">‹</button>
           <div class="preview-card-frame">
             <img id="preview-img" alt="Vista previa de camiseta" />
           </div>
-          <button class="nav-arrow next" onclick="cyclePhoto(1)" aria-label="Siguiente">›</button>
+          <button id="btn-next-photo" class="nav-arrow next hidden" onclick="cyclePhoto(1)" aria-label="Siguiente">›</button>
         </div>
 
         <div class="preview-meta">
@@ -1016,6 +1016,10 @@
       document.getElementById('btn-dorsal-no').classList.toggle('active', !enabled);
       document.getElementById('btn-dorsal-yes').classList.toggle('active', enabled);
       document.getElementById('dorsal-fields').classList.toggle('hidden', !enabled);
+      if (!enabled) {
+        document.getElementById('player-name').value = '';
+        document.getElementById('player-number').value = '';
+      }
       updateSummary();
     }
 
@@ -1077,7 +1081,7 @@
         const res = await fetch(`/api/kit?team=${encodeURIComponent(team)}&season=${encodeURIComponent(season)}&kit_type=${encodeURIComponent(kit)}`);
         if (res.ok) {
           const data = await res.json();
-          found = data.kits || [];
+          found = (data.kits || []).slice(0, 1);
         }
       } catch (_) {}
 
@@ -1095,9 +1099,14 @@
 
     function renderPhoto() {
       const img = document.getElementById('preview-img');
+      const prevBtn = document.getElementById('btn-prev-photo');
+      const nextBtn = document.getElementById('btn-next-photo');
       const current = state.photos[state.photoIdx];
       if (!current) return;
       img.src = current.url;
+      const hasMultiple = state.photos.length > 1;
+      prevBtn.classList.toggle('hidden', !hasMultiple);
+      nextBtn.classList.toggle('hidden', !hasMultiple);
     }
 
     function cyclePhoto(delta) {
