@@ -157,12 +157,16 @@ def buscar_en_google_imagenes(consulta: str) -> list[dict]:
         limpios = []
         for idx, item in enumerate(raw):
             url = item.get("imageUrl") or ""
+            title = item.get("title") or ""
+            w = item.get("imageWidth") or 0
+            h = item.get("imageHeight") or 0
             if url.startswith("https://"):
                 limpios.append({
                     "id": idx,
-                    "title": item.get("title") or "",
+                    "title": title,
                     "imageUrl": url,
-                    "link": item.get("link") or "",
+                    "width": w,
+                    "height": h,
                 })
         return limpios
     except requests.RequestException:
@@ -184,14 +188,14 @@ def elegir_con_ia(equipo: str, anio: str, tipo: str, candidatos: list[dict]) -> 
         return candidatos[0]
 
     prompt = (
-        f"Busco la camiseta de fútbol: equipo='{equipo}', año/temporada buscada='{anio}', "
-        f"formatos de temporada relacionados={temporadas}, equipación='{tipo}'.\n"
-        f"Elige el 'id' del candidato que mejor muestre la camiseta del equipo y tipo pedido.\n"
-        f"Prioridad:\n"
-        f"1. Que coincida con el año o temporada solicitada ({temporadas}).\n"
-        f"2. Que sea una foto/render de la camiseta (no un escudo, ni un balón, ni un jugador celebrando).\n"
-        f"3. Si ningún candidato muestra explícitamente ese año en el título, elige igualmente la mejor "
-        f"camiseta del equipo y tipo solicitado en vez de devolver null.\n\n"
+        f"Busco la foto completa de una camiseta de fútbol: equipo='{equipo}', "
+        f"año/temporada buscada='{anio}', formatos relacionados={temporadas}, equipación='{tipo}'.\n"
+        f"Elige el 'id' del candidato que mejor muestre la camiseta COMPLETA de frente.\n"
+        f"Reglas estrictas:\n"
+        f"1. Debe ser una camiseta completa (prenda entera visible), NUNCA un primer plano o zoom del escudo, "
+        f"ni un detalle del cuello/manga, ni un escudo suelto, ni un balón, ni un jugador de cintura para arriba.\n"
+        f"2. Que coincida con el equipo y, si es posible, con la temporada ({temporadas}) y equipación ({tipo}).\n"
+        f"3. Devuelve siempre un 'id' de la lista.\n\n"
         f"Candidatos JSON:\n{json.dumps(candidatos, ensure_ascii=False)}\n\n"
         f"Responde SOLO con JSON válido: {{\"id\": 0}}"
     )
@@ -239,10 +243,10 @@ def resolver_camisetas(equipo: str, anio: str, kit_type: str) -> list[dict]:
         temps = temporadas_para_anio(anio)
         consultas = []
         if temps:
-            consultas.append(f"{equipo} {temps[0]} {tipo_en} jersey")
+            consultas.append(f"{equipo} {temps[0]} {tipo_en} full jersey")
             if len(temps) > 2:
-                consultas.append(f"{equipo} {temps[2]} {tipo_en} jersey")
-        consultas.append(f"{equipo} {anio} {tipo_en} football shirt".strip())
+                consultas.append(f"{equipo} {temps[2]} {tipo_en} full jersey")
+        consultas.append(f"{equipo} {anio} {tipo_en} full shirt".strip())
 
         for q in consultas:
             candidatos = buscar_en_google_imagenes(q)
