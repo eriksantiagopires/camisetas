@@ -476,18 +476,21 @@
     .preview-card-frame {
       background: #f3f4f6;
       border-radius: 24px;
-      padding: 12px 18px;
+      width: 260px;
+      height: 295px;
+      padding: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
     }
 
     .preview-stage img {
-      max-width: 240px;
-      max-height: 290px;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
-      border-radius: 14px;
+      border-radius: 12px;
       display: block;
     }
 
@@ -763,7 +766,7 @@
         </div>
 
         <div class="preview-meta">
-          <h3 id="preview-team">RC Celta de Vigo</h3>
+          <h3 id="preview-team">Equipo</h3>
           <div id="preview-sub" class="sub">1ª Equipación • 2026/27</div>
           <div class="meta-tags">
             <span id="preview-dorsal" class="meta-pill">Dorsal: Sin dorsal</span>
@@ -1008,7 +1011,7 @@
       state.customer = { name, phone };
       document.getElementById('customer-badge').textContent = `${name} · ${phone}`;
       go('screen-builder');
-      loadKitPhotos();
+      renderPhoto();
     }
 
     function setDorsal(enabled) {
@@ -1035,7 +1038,7 @@
     }
 
     function updateSummary() {
-      const team = document.getElementById('team-input').value.trim() || 'RC Celta de Vigo';
+      const team = document.getElementById('team-input').value.trim() || 'Equipo';
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
       const patch = document.getElementById('patch-select').value;
@@ -1057,8 +1060,12 @@
       updateSummary();
       clearTimeout(searchTimer);
       const team = document.getElementById('team-input').value.trim();
-      if (!team) return;
-      searchTimer = setTimeout(loadKitPhotos, 350);
+      if (!team) {
+        state.photos = [];
+        renderPhoto();
+        return;
+      }
+      searchTimer = setTimeout(loadKitPhotos, 450);
     }
 
     function fallbackSvgJersey(team, kit, season) {
@@ -1072,9 +1079,10 @@
     }
 
     async function loadKitPhotos() {
-      const team = document.getElementById('team-input').value.trim() || 'RC Celta de Vigo';
+      const team = document.getElementById('team-input').value.trim();
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
+      if (!team) return;
 
       let found = [];
       try {
@@ -1101,9 +1109,13 @@
       const img = document.getElementById('preview-img');
       const prevBtn = document.getElementById('btn-prev-photo');
       const nextBtn = document.getElementById('btn-next-photo');
+      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const season = document.getElementById('season-input').value.trim() || '2026/27';
+      const kit = document.getElementById('kit-select').value;
+
       const current = state.photos[state.photoIdx];
-      if (!current) return;
-      img.src = current.url;
+      img.src = current ? current.url : fallbackSvgJersey(team, kit, season);
+
       const hasMultiple = state.photos.length > 1;
       prevBtn.classList.toggle('hidden', !hasMultiple);
       nextBtn.classList.toggle('hidden', !hasMultiple);
@@ -1116,7 +1128,7 @@
     }
 
     function addShirtToCart(addAnother) {
-      const team = document.getElementById('team-input').value.trim() || 'RC Celta de Vigo';
+      const team = document.getElementById('team-input').value.trim() || 'Equipo';
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
       const patch = document.getElementById('patch-select').value;
@@ -1247,6 +1259,7 @@
     }
 
     updateSummary();
+    renderPhoto();
   </script>
 </body>
 </html>
