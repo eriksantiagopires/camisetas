@@ -3,6 +3,7 @@ import os
 import unicodedata
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 import requests
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +34,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123").strip()
 CACHE: dict[str, list[dict]] = {}
 
+VALID_STATUSES = ("En espera", "Vendida", "Cancelado")
+
 
 class AdminLogin(BaseModel):
     password: str
@@ -56,8 +59,11 @@ class OrderCreate(BaseModel):
     items: list[OrderItem]
 
 
-class StatusUpdate(BaseModel):
-    status: str
+class OrderUpdate(BaseModel):
+    status: Optional[str] = None
+    customer: Optional[str] = None
+    phone: Optional[str] = None
+    total: Optional[float] = None
 
 
 def normalizar(texto: str) -> str:
@@ -339,16 +345,33 @@ def create_order(order: OrderCreate):
 
 
 @app.patch("/api/orders/{order_id}")
-def patch_order(order_id: str, payload: StatusUpdate):
-    if payload.status not in ("En espera", "Vendida"):
-        raise HTTPException(status_code=400, detail="Estado no válido")
+def patch_order(order_id: str, payload: OrderUpdate):
     orders = load_orders()
     for o in orders:
         if o["id"] == order_id:
-            o["status"] = payload.status
+            if payload.status is not None:
+                if payload.status not in VALID_STATUSES:
+                    raise HTTPException(status_code=400, detail="Estado no válido")
+                o["status"] = payload.status
+            if payload.customer is not None and payload.customer.strip():
+                o["customer"] = payload.customer.strip()
+            if payload.phone is not None and payload.phone.strip():
+                o["phone"] = payload.phone.strip()
+            if payload.total is not None and payload.total >= 0:
+                o["total"] = round(float(payload.total), 2)
             save_orders(orders)
             return {"order": o}
     raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+
+@app.delete("/api/orders/{order_id}")
+def delete_order(order_id: str):
+    orders = load_orders()
+    nuevos = [o for o in orders if o["id"] != order_id]
+    if len(nuevos) == len(orders):
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    save_orders(nuevos)
+    return {"ok": True}
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
