@@ -757,22 +757,24 @@
           <span id="preview-size" class="customer-pill">Talla M</span>
         </div>
 
-        <div class="preview-stage">
-          <button id="btn-prev-photo" class="nav-arrow prev hidden" onclick="cyclePhoto(-1)" aria-label="Anterior">‹</button>
-          <div class="preview-card-frame">
-            <img id="preview-img" alt="Vista previa de camiseta" />
+        <div id="preview-content" class="hidden" style="flex:1;display:flex;flex-direction:column;justify-content:space-between;">
+          <div class="preview-stage">
+            <button id="btn-prev-photo" class="nav-arrow prev hidden" onclick="cyclePhoto(-1)" aria-label="Anterior">‹</button>
+            <div class="preview-card-frame">
+              <img id="preview-img" alt="Vista previa de camiseta" />
+            </div>
+            <button id="btn-next-photo" class="nav-arrow next hidden" onclick="cyclePhoto(1)" aria-label="Siguiente">›</button>
           </div>
-          <button id="btn-next-photo" class="nav-arrow next hidden" onclick="cyclePhoto(1)" aria-label="Siguiente">›</button>
-        </div>
 
-        <div class="preview-meta">
-          <h3 id="preview-team">Equipo</h3>
-          <div id="preview-sub" class="sub">1ª Equipación • 2026/27</div>
-          <div class="meta-tags">
-            <span id="preview-dorsal" class="meta-pill">Dorsal: Sin dorsal</span>
-            <span id="preview-patch" class="meta-pill">Parche: Sin parche</span>
+          <div class="preview-meta">
+            <h3 id="preview-team"></h3>
+            <div id="preview-sub" class="sub"></div>
+            <div class="meta-tags">
+              <span id="preview-dorsal" class="meta-pill"></span>
+              <span id="preview-patch" class="meta-pill"></span>
+            </div>
+            <p class="preview-disclaimer" data-i18n="preview_disclaimer">(La camiseta de la imagen puede no corresponderse con la original)</p>
           </div>
-          <p class="preview-disclaimer" data-i18n="preview_disclaimer">(La camiseta de la imagen puede no corresponderse con la original)</p>
         </div>
       </div>
     </section>
@@ -1038,7 +1040,17 @@
     }
 
     function updateSummary() {
-      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const team = document.getElementById('team-input').value.trim();
+      const previewContent = document.getElementById('preview-content');
+      document.getElementById('preview-size').textContent = `Talla ${state.size}`;
+
+      if (!team) {
+        previewContent.classList.add('hidden');
+        return;
+      }
+
+      previewContent.classList.remove('hidden');
+
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
       const patch = document.getElementById('patch-select').value;
@@ -1051,7 +1063,6 @@
 
       document.getElementById('preview-team').textContent = team;
       document.getElementById('preview-sub').textContent = `${kit} • ${season}`;
-      document.getElementById('preview-size').textContent = `Talla ${state.size}`;
       document.getElementById('preview-dorsal').textContent = `Dorsal: ${dorsalLabel}`;
       document.getElementById('preview-patch').textContent = `Parche: ${patch === 'No, por defecto' ? 'Sin parche' : patch}`;
     }
@@ -1066,16 +1077,6 @@
         return;
       }
       searchTimer = setTimeout(loadKitPhotos, 450);
-    }
-
-    function fallbackSvgJersey(team, kit, season) {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
-        <rect width="320" height="320" rx="20" fill="#f3f4f6"/>
-        <path d="M95 55 L130 40 Q160 56 190 40 L225 55 L275 105 L242 142 L212 115 L212 275 L108 275 L108 115 L78 142 L45 105 Z" fill="#ffffff" stroke="#111111" stroke-width="5"/>
-        <text x="160" y="165" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="800" fill="#111111">${team.slice(0, 18)}</text>
-        <text x="160" y="190" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="600" fill="#333333">${kit} · ${season}</text>
-      </svg>`;
-      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     }
 
     async function loadKitPhotos() {
@@ -1093,28 +1094,26 @@
         }
       } catch (_) {}
 
-      if (!found.length) {
-        found = [{
-          url: fallbackSvgJersey(team, kit, season),
-          label: 'Vista previa genérica'
-        }];
-      }
-
       state.photos = found;
       state.photoIdx = 0;
       renderPhoto();
     }
 
     function renderPhoto() {
+      const team = document.getElementById('team-input').value.trim();
       const img = document.getElementById('preview-img');
       const prevBtn = document.getElementById('btn-prev-photo');
       const nextBtn = document.getElementById('btn-next-photo');
-      const team = document.getElementById('team-input').value.trim() || 'Equipo';
-      const season = document.getElementById('season-input').value.trim() || '2026/27';
-      const kit = document.getElementById('kit-select').value;
+
+      if (!team || !state.photos.length) {
+        img.removeAttribute('src');
+        prevBtn.classList.add('hidden');
+        nextBtn.classList.add('hidden');
+        return;
+      }
 
       const current = state.photos[state.photoIdx];
-      img.src = current ? current.url : fallbackSvgJersey(team, kit, season);
+      img.src = current.url;
 
       const hasMultiple = state.photos.length > 1;
       prevBtn.classList.toggle('hidden', !hasMultiple);
@@ -1128,7 +1127,11 @@
     }
 
     function addShirtToCart(addAnother) {
-      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const team = document.getElementById('team-input').value.trim();
+      if (!team) {
+        document.getElementById('team-input').focus();
+        return;
+      }
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
       const patch = document.getElementById('patch-select').value;
@@ -1143,13 +1146,16 @@
         patch,
         dorsalText: state.dorsalEnabled ? `${pName || 'Sin nombre'} · ${pNum || '00'} (+3€)` : 'Sin dorsal',
         price: currentShirtPrice(),
-        img: document.getElementById('preview-img').src
+        img: document.getElementById('preview-img').src || ''
       });
 
       if (addAnother) {
+        document.getElementById('team-input').value = '';
         document.getElementById('player-name').value = '';
         document.getElementById('player-number').value = '';
+        state.photos = [];
         setDorsal(false);
+        renderPhoto();
       } else {
         go('screen-cart');
       }
@@ -1166,7 +1172,7 @@
       }
       container.innerHTML = state.cart.map((item, idx) => `
         <div class="cart-item">
-          <img src="${item.img}" alt="${item.team}" />
+          ${item.img ? `<img src="${item.img}" alt="${item.team}" />` : ''}
           <div style="flex:1;">
             <strong>${item.team}</strong> (${item.kit} • ${item.season})
             <div style="font-size:.82rem;font-weight:600;color:#222;">
@@ -1210,6 +1216,8 @@
       state.cart = [];
       document.getElementById('cust-name').value = '';
       document.getElementById('cust-phone').value = '';
+      document.getElementById('team-input').value = '';
+      state.photos = [];
       go('screen-home');
     }
 
