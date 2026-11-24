@@ -466,83 +466,96 @@
     .preview-stage {
       position: relative;
       flex: 1;
-      min-height: 300px;
+      min-height: 280px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 8px 0;
+      margin: 6px 0 10px;
+    }
+
+    .preview-card-frame {
+      background: #f3f4f6;
+      border-radius: 24px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
     }
 
     .preview-stage img {
-      max-width: 100%;
-      max-height: 330px;
+      max-width: 240px;
+      max-height: 290px;
       object-fit: contain;
-      border-radius: 16px;
-      filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.35));
+      border-radius: 14px;
+      display: block;
     }
 
     .nav-arrow {
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       border: none;
-      background: rgba(17, 17, 17, 0.82);
-      color: #fff;
-      font-weight: 900;
-      font-size: 1.1rem;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 800;
+      font-size: 1.25rem;
       cursor: pointer;
+      transition: color 0.15s, transform 0.15s;
     }
 
-    .nav-arrow.prev { left: 0; }
-    .nav-arrow.next { right: 0; }
+    .nav-arrow:hover {
+      color: #ffffff;
+      transform: translateY(-50%) scale(1.12);
+    }
+
+    .nav-arrow.prev { left: 2px; }
+    .nav-arrow.next { right: 2px; }
 
     .preview-meta {
       text-align: center;
     }
 
     .preview-meta h3 {
-      font-size: 1.2rem;
+      font-size: 1.35rem;
       font-weight: 900;
-      color: #111;
+      color: #ffffff;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
     }
 
     .preview-meta .sub {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #222;
-      margin-bottom: 8px;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 10px;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
     }
 
     .meta-tags {
       display: flex;
       justify-content: center;
-      gap: 6px;
+      gap: 8px;
       flex-wrap: wrap;
       margin-bottom: 10px;
     }
 
     .meta-pill {
-      background: rgba(255, 255, 255, 0.72);
-      padding: 4px 10px;
+      background: #141414;
+      color: #ffffff;
+      padding: 5px 12px;
       border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #111;
+      font-size: 0.78rem;
+      font-weight: 800;
     }
 
-    .price-summary {
-      background: rgba(255, 255, 255, 0.42);
-      border-radius: 20px;
-      padding: 10px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 900;
-      font-size: 1.05rem;
-      color: #111;
+    .preview-disclaimer {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
     }
 
     /* CESTA Y ADMIN */
@@ -556,6 +569,18 @@
       border-radius: 36px;
       padding: 32px;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      color: #111;
+    }
+
+    .price-summary {
+      background: rgba(255, 255, 255, 0.42);
+      border-radius: 20px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 900;
+      font-size: 1.05rem;
       color: #111;
     }
 
@@ -659,15 +684,7 @@
           </div>
 
           <label class="field-label" for="team-input" data-i18n="team_label">Equipo o Selección *</label>
-          <input id="team-input" class="glass-input" type="text" value="RC Celta de Vigo" oninput="scheduleSearch()" />
-          <div class="pill-group">
-            <button class="chip active" onclick="quickTeam('RC Celta de Vigo', this)">Celta Vigo</button>
-            <button class="chip" onclick="quickTeam('Sport Lisboa e Benfica', this)">Benfica</button>
-            <button class="chip" onclick="quickTeam('Real Madrid', this)">Real Madrid</button>
-            <button class="chip" onclick="quickTeam('FC Barcelona', this)">FC Barcelona</button>
-            <button class="chip" onclick="quickTeam('España', this)">España</button>
-            <button class="chip" onclick="quickTeam('Argentina', this)">Argentina</button>
-          </div>
+          <input id="team-input" class="glass-input" type="text" placeholder="Ej. RC Celta de Vigo, Benfica, Real Madrid..." oninput="scheduleSearch()" />
 
           <div class="row-2">
             <div>
@@ -739,7 +756,9 @@
 
         <div class="preview-stage">
           <button class="nav-arrow prev" onclick="cyclePhoto(-1)" aria-label="Anterior">‹</button>
-          <img id="preview-img" alt="Vista previa de camiseta" />
+          <div class="preview-card-frame">
+            <img id="preview-img" alt="Vista previa de camiseta" />
+          </div>
           <button class="nav-arrow next" onclick="cyclePhoto(1)" aria-label="Siguiente">›</button>
         </div>
 
@@ -750,11 +769,7 @@
             <span id="preview-dorsal" class="meta-pill">Dorsal: Sin dorsal</span>
             <span id="preview-patch" class="meta-pill">Parche: Sin parche</span>
           </div>
-          <div id="preview-source" style="font-size:.72rem;color:#222;margin-bottom:10px;"></div>
-          <div class="price-summary">
-            <span data-i18n="total_shirt">TOTAL CAMISETA</span>
-            <span id="preview-total">25,00 €</span>
-          </div>
+          <p class="preview-disclaimer" data-i18n="preview_disclaimer">(La camiseta de la imagen puede no corresponderse con la original)</p>
         </div>
       </div>
     </section>
@@ -820,7 +835,7 @@
         btn_add_more: '+ Añadir otra',
         btn_finish: 'Finalizar pedido →',
         preview_title: 'VISTA PREVIA',
-        total_shirt: 'TOTAL CAMISETA',
+        preview_disclaimer: '(La camiseta de la imagen puede no corresponderse con la original)',
         cart_title: 'CESTA DE COMPRA',
         order_total: 'TOTAL DEL PEDIDO',
         btn_confirm: 'Confirmar pedido',
@@ -849,7 +864,7 @@
         btn_add_more: '+ Engadir outra',
         btn_finish: 'Finalizar pedido →',
         preview_title: 'VISTA PREVIA',
-        total_shirt: 'TOTAL CAMISETA',
+        preview_disclaimer: '(A camiseta da imaxe pode non corresponderse coa orixinal)',
         cart_title: 'CESTA DA COMPRA',
         order_total: 'TOTAL DO PEDIDO',
         btn_confirm: 'Confirmar pedido',
@@ -878,7 +893,7 @@
         btn_add_more: '+ Adicionar outra',
         btn_finish: 'Finalizar pedido →',
         preview_title: 'PRÉ-VISUALIZAÇÃO',
-        total_shirt: 'TOTAL CAMISOLA',
+        preview_disclaimer: '(A camisola da imagem pode não corresponder ao original)',
         cart_title: 'CARRINHO DE COMPRAS',
         order_total: 'TOTAL DO PEDIDO',
         btn_confirm: 'Confirmar pedido',
@@ -907,7 +922,7 @@
         btn_add_more: '+ Add another',
         btn_finish: 'Checkout →',
         preview_title: 'LIVE PREVIEW',
-        total_shirt: 'SHIRT TOTAL',
+        preview_disclaimer: '(The shirt shown may not match the original)',
         cart_title: 'SHOPPING CART',
         order_total: 'ORDER TOTAL',
         btn_confirm: 'Place order',
@@ -996,13 +1011,6 @@
       loadKitPhotos();
     }
 
-    function quickTeam(team, btn) {
-      document.getElementById('team-input').value = team;
-      document.querySelectorAll('.pill-group .chip:not(.seg-btn)').forEach(c => c.classList.remove('active'));
-      if (btn) btn.classList.add('active');
-      scheduleSearch();
-    }
-
     function setDorsal(enabled) {
       state.dorsalEnabled = enabled;
       document.getElementById('btn-dorsal-no').classList.toggle('active', !enabled);
@@ -1023,7 +1031,7 @@
     }
 
     function updateSummary() {
-      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const team = document.getElementById('team-input').value.trim() || 'RC Celta de Vigo';
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
       const patch = document.getElementById('patch-select').value;
@@ -1039,19 +1047,20 @@
       document.getElementById('preview-size').textContent = `Talla ${state.size}`;
       document.getElementById('preview-dorsal').textContent = `Dorsal: ${dorsalLabel}`;
       document.getElementById('preview-patch').textContent = `Parche: ${patch === 'No, por defecto' ? 'Sin parche' : patch}`;
-      document.getElementById('preview-total').textContent = `${currentShirtPrice().toFixed(2).replace('.', ',')} €`;
     }
 
     function scheduleSearch() {
       updateSummary();
       clearTimeout(searchTimer);
+      const team = document.getElementById('team-input').value.trim();
+      if (!team) return;
       searchTimer = setTimeout(loadKitPhotos, 350);
     }
 
     function fallbackSvgJersey(team, kit, season) {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
-        <rect width="320" height="320" rx="24" fill="rgba(255,255,255,0.85)"/>
-        <path d="M95 55 L130 40 Q160 56 190 40 L225 55 L275 105 L242 142 L212 115 L212 275 L108 275 L108 115 L78 142 L45 105 Z" fill="#f8fafc" stroke="#111111" stroke-width="5"/>
+        <rect width="320" height="320" rx="20" fill="#f3f4f6"/>
+        <path d="M95 55 L130 40 Q160 56 190 40 L225 55 L275 105 L242 142 L212 115 L212 275 L108 275 L108 115 L78 142 L45 105 Z" fill="#ffffff" stroke="#111111" stroke-width="5"/>
         <text x="160" y="165" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="800" fill="#111111">${team.slice(0, 18)}</text>
         <text x="160" y="190" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="600" fill="#333333">${kit} · ${season}</text>
       </svg>`;
@@ -1062,8 +1071,6 @@
       const team = document.getElementById('team-input').value.trim() || 'RC Celta de Vigo';
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
-      const sourceEl = document.getElementById('preview-source');
-      sourceEl.textContent = 'Buscando camiseta oficial...';
 
       let found = [];
       try {
@@ -1088,11 +1095,9 @@
 
     function renderPhoto() {
       const img = document.getElementById('preview-img');
-      const sourceEl = document.getElementById('preview-source');
       const current = state.photos[state.photoIdx];
       if (!current) return;
       img.src = current.url;
-      sourceEl.textContent = `${current.label} (${state.photoIdx + 1}/${state.photos.length})`;
     }
 
     function cyclePhoto(delta) {
@@ -1102,7 +1107,7 @@
     }
 
     function addShirtToCart(addAnother) {
-      const team = document.getElementById('team-input').value.trim() || 'Equipo';
+      const team = document.getElementById('team-input').value.trim() || 'RC Celta de Vigo';
       const season = document.getElementById('season-input').value.trim() || '2026/27';
       const kit = document.getElementById('kit-select').value;
       const patch = document.getElementById('patch-select').value;
