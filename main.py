@@ -31,7 +31,7 @@ ORDERS_FILE = BASE_DIR / "orders.json"
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123").strip()
-CACHE: dict[str, dict] = {}
+CACHE: dict[str, list[dict]] = {}
 
 
 class AdminLogin(BaseModel):
@@ -228,7 +228,7 @@ def resolver_camisetas(equipo: str, anio: str, kit_type: str) -> list[dict]:
     resultados: list[dict] = []
     resultados.extend(buscar_en_catalogo_local(equipo, anio, tipo_code))
 
-    if SERPER_API_KEY:
+    if not resultados and SERPER_API_KEY:
         tipo_en = {
             "home": "home kit",
             "away": "away kit",
@@ -253,14 +253,9 @@ def resolver_camisetas(equipo: str, anio: str, kit_type: str) -> list[dict]:
                         "url": elegido["imageUrl"],
                         "label": elegido["title"] or f"{equipo.title()} {anio} ({tipo_code.upper()})".strip(),
                     })
-                for c in candidatos[:4]:
-                    if c["imageUrl"] and not any(x["url"] == c["imageUrl"] for x in resultados):
-                        resultados.append({
-                            "url": c["imageUrl"],
-                            "label": c["title"] or f"{equipo.title()} ({tipo_code.upper()})",
-                        })
                 break
 
+    resultados = resultados[:1]
     CACHE[clave] = resultados
     return resultados
 
