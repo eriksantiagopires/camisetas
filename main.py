@@ -30,7 +30,12 @@ ORDERS_FILE = BASE_DIR / "orders.json"
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123").strip()
 CACHE: dict[str, dict] = {}
+
+
+class AdminLogin(BaseModel):
+    password: str
 
 
 class OrderItem(BaseModel):
@@ -221,11 +226,8 @@ def resolver_camisetas(equipo: str, anio: str, kit_type: str) -> list[dict]:
         return CACHE[clave]
 
     resultados: list[dict] = []
-
-    # 1. Catálogo local (camisetas.json + /static/kits)
     resultados.extend(buscar_en_catalogo_local(equipo, anio, tipo_code))
 
-    # 2. Serper Google Images + Gemini
     if SERPER_API_KEY:
         tipo_en = {
             "home": "home kit",
@@ -261,6 +263,13 @@ def resolver_camisetas(equipo: str, anio: str, kit_type: str) -> list[dict]:
 
     CACHE[clave] = resultados
     return resultados
+
+
+@app.post("/api/admin/login")
+def admin_login(payload: AdminLogin):
+    if payload.password == ADMIN_PASSWORD:
+        return {"ok": True}
+    raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
 
 @app.get("/api/buscar")
